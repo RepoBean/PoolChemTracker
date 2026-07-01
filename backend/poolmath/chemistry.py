@@ -269,6 +269,49 @@ def dose_ta_down_muriatic(delta_ta: float, volume_gal: float, percent: float = 3
     )
 
 
+def compute_dose(*, parameter: str, chemical: str, current: float, goal: float,
+                 volume_gal: float, strength: Optional[str] = None,
+                 total_alkalinity: Optional[float] = None) -> DoseResult:
+    """Dispatch a dose request to the right TFP calculation. Keeps the API dumb."""
+    delta = goal - current
+    p, c = parameter, chemical
+
+    if p == "fc":
+        if delta <= 0:
+            return DoseResult("none", "fc", 0.0, "", "decrease",
+                              note="To lower FC, just wait — sun and organics consume it.")
+        if c == "cal_hypo":
+            return dose_fc_cal_hypo(delta, volume_gal, float(strength or 73))
+        if c == "dichlor":
+            return dose_fc_dichlor(delta, volume_gal, float(strength or 56))
+        return dose_fc_liquid_chlorine(delta, volume_gal, float(strength or 12.5))
+    if p == "ph":
+        if delta < 0:
+            if total_alkalinity is None:
+                raise ValueError("ph-down dose requires total_alkalinity")
+            return dose_ph_down_muriatic(delta, volume_gal, total_alkalinity, float(strength or 31.45))
+        return DoseResult("borax_or_aeration", "ph", 0.0, "", "increase",
+                          note="Raise pH with aeration or 20 Mule Team Borax (only if pH<7 and TA≥50).")
+    if p == "ta":
+        if delta >= 0:
+            return dose_ta_baking_soda(delta, volume_gal)
+        return dose_ta_down_muriatic(delta, volume_gal, float(strength or 31.45))
+    if p == "ch":
+        if delta < 0:
+            return _no_chemical("ch")
+        return dose_ch_calcium_chloride(delta, volume_gal, str(strength or "dihydrate"))
+    if p == "cya":
+        return dose_cya(delta, volume_gal) if delta >= 0 else _no_chemical("cya")
+    if p == "salt":
+        return dose_salt(delta, volume_gal) if delta >= 0 else _no_chemical("salt")
+    raise ValueError(f"unsupported dose parameter: {parameter}")
+
+
+def _no_chemical(param: str) -> DoseResult:
+    return DoseResult("none", param, 0.0, "", "decrease",
+                      note="No chemical lowers this — partial drain/refill or RO only.")
+
+
 # --------------------------------------------------------------------------
 # Volume (geometry; pypoolchem handles the shapes)
 # --------------------------------------------------------------------------
