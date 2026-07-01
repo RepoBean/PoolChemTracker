@@ -1,0 +1,32 @@
+# Keep the build context (and final image) lean.
+
+# VCS / project meta
+.git
+.gitignore
+.github
+
+# Python
+.venv
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+
+# Node / frontend (rebuilt inside the image)
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Data & secrets (never bake the pool DB or env into an image)
+data
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.swp

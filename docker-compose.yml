@@ -1,0 +1,42 @@
+# PoolMath — single-service stack. Zero-config: `docker compose up` just works.
+# Deploy target: /opt/docker/poolmath on d3050 (Portainer stack). LAN only —
+# front with your existing reverse proxy; do not expose to the internet.
+
+services:
+  poolmath:
+    build: .
+    image: poolmath:latest
+    container_name: poolmath
+    restart: unless-stopped
+
+    # LAN access on :8790. To front with a reverse proxy on the same host and
+    # keep it off other interfaces, bind to loopback instead:
+    #   - "127.0.0.1:8790:8790"
+    ports:
+      - "8790:8790"
+
+    environment:
+      # Timezone for log timestamps (override in .env or here).
+      TZ: ${TZ:-America/New_York}
+      # SQLite lives on the bind-mounted volume below.
+      POOLMATH_DB_PATH: /data/poolmath.db
+      # Optional shared token — unset = open on the LAN. Uncomment to lock down.
+      # POOLMATH_AUTH_TOKEN: ${POOLMATH_AUTH_TOKEN:-}
+      # Optional Home Assistant MQTT publish (wired up in a later phase).
+      # MQTT_HOST: ${MQTT_HOST:-}
+      # MQTT_PORT: ${MQTT_PORT:-1883}
+      # MQTT_USERNAME: ${MQTT_USERNAME:-}
+      # MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      # MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-poolmath}
+
+    # SQLite file persists here (ZFS-snapshotted on d3050). The host ./data dir
+    # must be writable by uid 1000 (see README "Deploy (Docker)").
+    volumes:
+      - ./data:/data
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8790/api/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
