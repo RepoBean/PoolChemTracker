@@ -45,22 +45,57 @@ uv pip install -e "backend[dev]"
 uv run pytest backend/tests -q       # 47 chemistry tests
 ```
 
-## Deployment (target: d3050 `/opt/docker/poolmath`)
+## Deploy (Docker)
 
-One container + a bind-mounted `./data` for the SQLite file (covered by ZFS
-snapshots). Front with your existing reverse proxy; expose only over LAN/WireGuard.
+One container: a multi-stage image builds the React PWA and FastAPI serves the
+built bundle plus the `/api`. State is a single SQLite file on a bind-mounted
+`./data` (covered by ZFS snapshots on d3050). LAN only — front with your
+existing reverse proxy; do not expose to the internet.
 
-Config via env: `POOLMATH_DB_PATH`, `TZ`, optional `POOLMATH_AUTH_TOKEN`
-(unset = open on LAN), optional `MQTT_*` for Home Assistant.
+```bash
+git clone https://github.com/RepoBean/PoolChemTracker.git poolmath
+cd poolmath
+docker compose up -d --build      # zero-config: no .env required
+curl http://localhost:8790/api/health   # {"status":"ok",...}
+```
+
+That's it — open `http://<host>:8790/`. The SQLite DB is created on first run at
+`./data/poolmath.db`.
+
+**Data volume.** `./data` is bind-mounted to `/data` in the container. The app
+runs as **uid 1000**, so on a host where that dir isn't already owned by 1000,
+make it writable once:
+
+```bash
+mkdir -p data && sudo chown -R 1000:1000 data
+```
+
+**Config (env, all optional).** Defaults work with nothing set; override in a
+`.env` next to the compose file (see [`.env.example`](.env.example)):
+
+| Var | Default | Purpose |
+|---|---|---|
+| `TZ` | `America/New_York` | Timezone for log timestamps |
+| `POOLMATH_DB_PATH` | `/data/poolmath.db` | SQLite location (inside the volume) |
+| `POOLMATH_AUTH_TOKEN` | *unset* | Set to require a shared token; unset = open on LAN |
+| `MQTT_*` | *unset* | Home Assistant publish (wired up in a later phase) |
+
+**Reverse proxy.** `docker-compose.yml` publishes `8790:8790` on the LAN. To
+keep it off other interfaces and front it with a proxy on the same host, switch
+the port mapping to `127.0.0.1:8790:8790` (commented example in the file).
+
+**Portainer (d3050).** Target `/opt/docker/poolmath`. Deploy as a stack from
+this repo (or the web editor), keeping the `./data` bind mount so the DB is
+ZFS-snapshotted with the rest of `/opt/docker`.
 
 ## Status
 
 - [x] Chemistry engine + TFP validation tests
-- [ ] Pool CRUD + volume estimator
-- [ ] Test logging + targets + dosing endpoints
-- [ ] Dose logging + consumption tracking
-- [ ] Frontend (dashboard, log, dosing, trends)
-- [ ] PWA + Docker deploy
+- [x] Pool CRUD + volume estimator
+- [x] Test logging + targets + dosing endpoints
+- [x] Dose logging + consumption tracking
+- [x] Frontend (dashboard, log, dosing, trends)
+- [x] PWA + Docker image (multi-stage, compose stack)
 - [ ] MQTT → Home Assistant
 
 See [`PLAN.md`](PLAN.md).
