@@ -26,6 +26,7 @@ export function TestForm({ onSaved }: { onSaved?: (r: LogTestResult) => void }) 
 
   if (!current) return null;
   const set = (k: string) => (v: number | null) => setF((s) => ({ ...s, [k]: v }));
+  const hasReading = Object.values(f).some((v) => v != null);
 
   async function save() {
     setSaving(true);
@@ -47,19 +48,19 @@ export function TestForm({ onSaved }: { onSaved?: (r: LogTestResult) => void }) 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <NumberField label="FC" unit="ppm" value={f.fc} onChange={set("fc")} />
-        <NumberField label="pH" value={f.ph} step="0.1" onChange={set("ph")} />
-        <NumberField label="CC" unit="ppm" value={f.cc} onChange={set("cc")} />
-        <NumberField label="TA" unit="ppm" step="1" value={f.ta} onChange={set("ta")} />
-        <NumberField label="CH" unit="ppm" step="5" value={f.ch} onChange={set("ch")} />
-        <NumberField label="CYA" unit="ppm" step="1" value={f.cya} onChange={set("cya")} />
-        {current.uses_salt && <NumberField label="Salt" unit="ppm" step="10" value={f.salt} onChange={set("salt")} />}
-        {current.uses_borates && <NumberField label="Borate" unit="ppm" step="1" value={f.borate} onChange={set("borate")} />}
-        <NumberField label="Temp" unit="°F" step="1" value={f.water_temp_f} onChange={set("water_temp_f")} />
+        <NumberField label="FC" unit="ppm" min={0} value={f.fc} onChange={set("fc")} />
+        <NumberField label="pH" value={f.ph} step="0.1" min={0} onChange={set("ph")} />
+        <NumberField label="CC" unit="ppm" min={0} value={f.cc} onChange={set("cc")} />
+        <NumberField label="TA" unit="ppm" step="1" min={0} value={f.ta} onChange={set("ta")} />
+        <NumberField label="CH" unit="ppm" step="5" min={0} value={f.ch} onChange={set("ch")} />
+        <NumberField label="CYA" unit="ppm" step="1" min={0} value={f.cya} onChange={set("cya")} />
+        {current.uses_salt && <NumberField label="Salt" unit="ppm" step="10" min={0} value={f.salt} onChange={set("salt")} />}
+        {current.uses_borates && <NumberField label="Borate" unit="ppm" step="1" min={0} value={f.borate} onChange={set("borate")} />}
+        <NumberField label="Temp" unit="°F" step="1" min={0} value={f.water_temp_f} onChange={set("water_temp_f")} />
       </div>
       <TextField label="Notes" value={notes} onChange={setNotes} placeholder="Optional" />
       <ErrorText msg={err} />
-      <Button className="w-full" onClick={save} disabled={saving}>
+      <Button className="w-full" onClick={save} disabled={saving || !hasReading}>
         {saving ? "Saving…" : "Save test"}
       </Button>
 

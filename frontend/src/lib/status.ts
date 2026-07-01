@@ -1,12 +1,16 @@
 import type { Targets } from "../types";
 
 // "high" = above target but still safe (FC up to SLAM). It's intentionally NOT
-// red — TFP: FC up to SLAM level is safe to swim.
-export type Status = "low" | "acceptable_low" | "ideal" | "acceptable_high" | "high" | "unknown";
+// red — TFP: FC up to SLAM level is safe to swim. "too_high" is the opposite:
+// above the acceptable max for a param where that's a problem (pH, TA, CH, CYA),
+// so it's red like "low" — both directions out of range.
+export type Status =
+  | "low" | "acceptable_low" | "ideal" | "acceptable_high" | "high" | "too_high" | "unknown";
 
 export function statusClasses(s: Status): string {
   switch (s) {
     case "low":
+    case "too_high":
       return "bg-red-50 text-red-700 border-red-300";
     case "acceptable_low":
     case "acceptable_high":
@@ -23,6 +27,7 @@ export function statusClasses(s: Status): string {
 export function dotClasses(s: Status): string {
   switch (s) {
     case "low":
+    case "too_high":
       return "bg-red-500";
     case "acceptable_low":
     case "acceptable_high":
@@ -46,7 +51,7 @@ export function fcStatus(fc: number | null | undefined, t: Targets | null): Stat
 
 export function phStatus(ph: number | null | undefined): Status {
   if (ph == null) return "unknown";
-  if (ph < 7.2 || ph > 8.0) return ph < 7.2 ? "low" : "high";
+  if (ph < 7.2 || ph > 8.0) return ph < 7.2 ? "low" : "too_high";
   if (ph < 7.6) return "acceptable_low";
   if (ph <= 7.8) return "ideal";
   return "acceptable_high";
@@ -75,7 +80,7 @@ export function bandStatus(
   min: number, idealLow: number, idealHigh: number, max: number,
 ): Status {
   if (v == null) return "unknown";
-  if (v < min || v > max) return v < min ? "low" : "high";
+  if (v < min || v > max) return v < min ? "low" : "too_high";
   if (v < idealLow) return "acceptable_low";
   if (v <= idealHigh) return "ideal";
   return "acceptable_high";

@@ -5,12 +5,22 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from sqlmodel import Field, SQLModel
 
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _iso_utc(v: datetime) -> str:
+    """Serialize a datetime as explicit UTC. SQLite stores our ``utcnow()`` values
+    as naive strings; without an offset a browser's ``new Date()`` parses them as
+    *local* time, shifting every displayed timestamp. Emitting +00:00 keeps clients
+    (and future MQTT/export consumers) unambiguous."""
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=timezone.utc)
+    return v.isoformat()
 
 
 # --- Tables ----------------------------------------------------------------
@@ -23,6 +33,10 @@ class Pool(SQLModel, table=True):
     uses_salt: bool = False
     uses_borates: bool = False
     created_at: datetime = Field(default_factory=utcnow)
+
+    @field_serializer("created_at")
+    def _ser_created_at(self, v: datetime) -> str:
+        return _iso_utc(v)
 
 
 class TestLog(SQLModel, table=True):
@@ -42,6 +56,10 @@ class TestLog(SQLModel, table=True):
     csi: Optional[float] = None           # computed on save
     notes: Optional[str] = None
 
+    @field_serializer("taken_at")
+    def _ser_taken_at(self, v: datetime) -> str:
+        return _iso_utc(v)
+
 
 class DoseLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -56,6 +74,10 @@ class DoseLog(SQLModel, table=True):
     to_value: Optional[float] = None
     cost: Optional[float] = None
     test_log_id: Optional[int] = Field(default=None, foreign_key="testlog.id")
+
+    @field_serializer("applied_at")
+    def _ser_applied_at(self, v: datetime) -> str:
+        return _iso_utc(v)
 
 
 class Chemical(SQLModel, table=True):

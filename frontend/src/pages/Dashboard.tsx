@@ -150,7 +150,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Left: readings, trends, recent tests */}
-        <div className="xl:col-span-8 space-y-6">
+        <div className="xl:col-span-8 space-y-6 order-last xl:order-none">
           {t && (
             <Card>
               <div className="text-sm font-medium mb-3">Latest readings</div>
@@ -204,12 +204,13 @@ export default function Dashboard() {
           )}
 
           {!t && (
-            <Card>Log your first test using the form on the right — targets and status will appear here.</Card>
+            <Card>Log your first test — your targets and status will appear here.</Card>
           )}
         </div>
 
-        {/* Right rail: log form, targets, next action */}
-        <div className="xl:col-span-4 space-y-6">
+        {/* Right rail: log form, targets, next action. Ordered first on phones so
+            the primary action isn't buried below the history. */}
+        <div className="xl:col-span-4 space-y-6 order-first xl:order-none">
           <Card>
             <div className="text-sm font-medium mb-3">Log a test</div>
             <TestForm onSaved={reload} />

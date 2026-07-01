@@ -39,7 +39,7 @@ export default function Layout() {
         <nav className="flex md:flex-col md:p-2 ml-auto md:ml-0">
           {tabs.map((t) => (
             <NavLink
-              key={t.to} to={t.to} end={t.end}
+              key={t.to} to={t.to} end={t.end} title={t.label} aria-label={t.label}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 md:rounded-xl text-sm font-medium transition ${
                   isActive ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"

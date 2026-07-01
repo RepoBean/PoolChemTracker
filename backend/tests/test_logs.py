@@ -50,6 +50,18 @@ def test_inventory_dose_decrement_and_cost(client):
     assert client.get(f"/api/pools/{pid}/chemicals").json()[0]["qty_on_hand"] == 96
 
 
+def test_timestamps_serialized_as_utc(client):
+    # Naive UTC stored in SQLite must serialize with an explicit offset, or the
+    # browser's new Date() parses it as local time and shifts every timestamp.
+    pid = _make_pool(client)
+    body = client.post(f"/api/pools/{pid}/tests", json={"fc": 5, "ph": 7.5}).json()
+    assert body["test"]["taken_at"].endswith("+00:00")
+    assert client.get("/api/pools").json()[0]["created_at"].endswith("+00:00")
+    dose = client.post(f"/api/pools/{pid}/doses", json={
+        "chemical": "acid", "amount": 8, "unit": "fl_oz"}).json()
+    assert dose["applied_at"].endswith("+00:00")
+
+
 def test_consumption_summary(client):
     pid = _make_pool(client)
     client.post(f"/api/pools/{pid}/doses", json={"chemical": "acid", "amount": 16, "unit": "fl_oz", "cost": 2.0})

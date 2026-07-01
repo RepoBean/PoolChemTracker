@@ -3,6 +3,7 @@ import { api } from "../api";
 import { usePools } from "../state/PoolContext";
 import { NoPool } from "../components/Empty";
 import { Button, Card, ErrorText, NumberField, SelectField } from "../components/ui";
+import { prettyUnit } from "../lib/format";
 import type { Chemical, DoseResult, TestLog } from "../types";
 
 const PARAMS = [
@@ -151,7 +152,7 @@ export default function Dosing() {
           {result.amount > 0 ? (
             <div className="text-center">
               <div className="text-4xl font-bold text-sky-700">
-                {result.amount} <span className="text-lg font-normal">{result.unit}</span>
+                {result.amount} <span className="text-lg font-normal">{prettyUnit(result.unit)}</span>
               </div>
               <div className="text-sm text-slate-500">{result.chemical.replace(/_/g, " ")}</div>
             </div>

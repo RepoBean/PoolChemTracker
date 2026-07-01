@@ -4,6 +4,7 @@ import { api } from "../api";
 import { usePools } from "../state/PoolContext";
 import { NoPool } from "../components/Empty";
 import { Button, Card, ErrorText, NumberField, TextField } from "../components/ui";
+import { money, prettyUnit } from "../lib/format";
 import type { Chemical, ConsumptionItem, DoseLog } from "../types";
 
 export default function Consumption() {
@@ -88,8 +89,8 @@ export default function Consumption() {
                   {items.map((i) => (
                     <tr key={i.chemical} className="border-t border-slate-100">
                       <td className="py-1">{i.chemical}</td>
-                      <td>{i.total_amount} {i.unit}</td>
-                      <td>${i.total_cost.toFixed(2)}</td>
+                      <td>{i.total_amount} {prettyUnit(i.unit)}</td>
+                      <td>{money(i.total_cost)}</td>
                       <td>{i.count}</td>
                     </tr>
                   ))}
@@ -106,7 +107,7 @@ export default function Consumption() {
                   <div key={d.id} className="flex justify-between border-t border-slate-100 py-1">
                     <span>{d.chemical}</span>
                     <span className="text-slate-500">
-                      {d.amount} {d.unit}{d.cost != null ? ` · $${d.cost}` : ""}
+                      {d.amount} {prettyUnit(d.unit)}{d.cost != null ? ` · ${money(d.cost)}` : ""}
                     </span>
                   </div>
                 ))}
@@ -125,7 +126,8 @@ export default function Consumption() {
                 <div>
                   <div className="font-medium">{c.name}</div>
                   <div className="text-slate-400">
-                    {c.qty_on_hand} {c.unit}{c.cost_per_unit != null ? ` · $${c.cost_per_unit}/${c.unit}` : ""}
+                    {c.qty_on_hand} {prettyUnit(c.unit)}
+                    {c.cost_per_unit != null ? ` · ${money(c.cost_per_unit)}/${prettyUnit(c.unit)}` : ""}
                   </div>
                 </div>
                 <button onClick={() => del(c.id)} className="text-red-500 text-sm">Remove</button>

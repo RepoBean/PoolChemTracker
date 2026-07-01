@@ -48,15 +48,16 @@ const inputCls =
   "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500";
 
 export function NumberField({
-  label, unit, value, onChange, step = "0.1", placeholder,
+  label, unit, value, onChange, step = "0.1", placeholder, min,
 }: {
   label: string; unit?: string; value: number | null; step?: string; placeholder?: string;
+  min?: number;
   onChange: (v: number | null) => void;
 }) {
   return fieldWrap(
     label, unit,
     <input
-      type="number" inputMode="decimal" step={step} placeholder={placeholder}
+      type="number" inputMode="decimal" step={step} placeholder={placeholder} min={min}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
       className={inputCls}
@@ -99,7 +100,8 @@ export function Toggle({
     <label className="flex items-center justify-between py-2">
       <span className="text-sm text-slate-700">{label}</span>
       <button
-        type="button" onClick={() => onChange(!checked)}
+        type="button" role="switch" aria-checked={checked} aria-label={label}
+        onClick={() => onChange(!checked)}
         className={`h-6 w-11 rounded-full transition ${checked ? "bg-sky-600" : "bg-slate-300"}`}
       >
         <span className={`block h-5 w-5 rounded-full bg-white transition ${checked ? "translate-x-5" : "translate-x-1"}`} />
@@ -119,7 +121,8 @@ export function Modal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 text-2xl leading-none">×</button>
+          <button type="button" onClick={onClose} aria-label="Close"
+                  className="text-slate-400 text-2xl leading-none">×</button>
         </div>
         {children}
       </div>
