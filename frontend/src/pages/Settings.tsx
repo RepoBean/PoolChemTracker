@@ -59,7 +59,8 @@ export default function Settings() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">{current ? "Pool settings" : "Set up your pool"}</h1>
+      <h1 className="text-2xl font-bold">{current ? "Pool settings" : "Set up your pool"}</h1>
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-3">
         <TextField label="Pool name" value={name} onChange={setName} placeholder="Backyard" />
         <div>
@@ -77,10 +78,19 @@ export default function Settings() {
         </Button>
       </Card>
 
-      <p className="text-xs text-slate-400">
-        Follows TroubleFreePool methodology; chemistry validated against TFP's published tables.
-        Always confirm a dose with your own test kit before adding it.
-      </p>
+      <Card className="text-sm text-slate-600 space-y-2">
+        <div className="font-medium text-slate-800">About</div>
+        <p>
+          Targets and dosing follow TroubleFreePool (TFP) methodology; the chemistry engine is
+          validated against TFP's published tables. CSI uses the pypoolchem library.
+        </p>
+        <p>
+          FC up to SLAM level is safe to swim — it isn't "over-chlorinated," because CYA buffers
+          active chlorine.
+        </p>
+        <p className="text-slate-400">Always confirm a dose with your own test kit before adding it.</p>
+      </Card>
+      </div>
 
       <VolumeEstimator open={estOpen} onClose={() => setEstOpen(false)} onUse={(g) => setVolume(g)} />
     </div>

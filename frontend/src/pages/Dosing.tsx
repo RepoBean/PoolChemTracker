@@ -118,7 +118,8 @@ export default function Dosing() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Dosing</h1>
+      <h1 className="text-2xl font-bold">Dosing</h1>
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-3">
         <SelectField label="Parameter" value={param} onChange={setParam} options={PARAMS} />
         <SelectField label="Chemical" value={chemical} onChange={pickChemical} options={CHEMS[param]} />
@@ -179,6 +180,7 @@ export default function Dosing() {
           )}
         </Card>
       )}
+      </div>
     </div>
   );
 }

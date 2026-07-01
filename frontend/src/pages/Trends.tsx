@@ -83,7 +83,7 @@ export default function Trends() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Trends</h1>
+        <h1 className="text-2xl font-bold">Trends</h1>
         <div className="flex gap-1">
           {RANGES.map((r) => (
             <button key={r.label} onClick={() => setDays(r.d)}
@@ -97,13 +97,13 @@ export default function Trends() {
       {data.length === 0 ? (
         <Card>No tests in this range.</Card>
       ) : (
-        <>
+        <div className="grid lg:grid-cols-2 gap-4">
           <ChartCard title="Free Chlorine (ppm)" data={data} dataKey="fc" color="#0284c7"
             band={targets ? { y1: targets.target_fc_low, y2: targets.target_fc_high } : undefined} />
           <ChartCard title="pH" data={data} dataKey="ph" color="#7c3aed" band={{ y1: 7.6, y2: 7.8 }} domain={[6.8, 8.2]} />
           <ChartCard title="CSI" data={data} dataKey="csi" color="#059669" band={{ y1: -0.3, y2: 0.3 }} domain={[-1, 1]} />
           <ChartCard title="TA / CH / CYA (ppm)" data={data} multi />
-        </>
+        </div>
       )}
     </div>
   );
