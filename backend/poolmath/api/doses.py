@@ -1,0 +1,92 @@
+"""Dose logging + consumption/cost summary."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+
+from ..db import get_session
+from ..models import Chemical, DoseLog, DoseLogCreate, Pool
+
+router = APIRouter(prefix="/api/pools", tags=["doses"])
+
+
+def _get_pool(pool_id: int, session: Session) -> Pool:
+    pool = session.get(Pool, pool_id)
+    if not pool:
+        raise HTTPException(404, "pool not found")
+    return pool
+
+
+@router.post("/{pool_id}/doses", status_code=201)
+def create_dose(pool_id: int, body: DoseLogCreate, session: Session = Depends(get_session)):
+    _get_pool(pool_id, session)
+    dose = DoseLog(pool_id=pool_id, **body.model_dump(exclude={"applied_at", "chemical_id"}))
+    if body.applied_at:
+        dose.applied_at = body.applied_at
+
+    # Optionally draw down inventory and derive cost.
+    if body.chemical_id is not None:
+        item = session.get(Chemical, body.chemical_id)
+        if not item or item.pool_id != pool_id:
+            raise HTTPException(404, "chemical (inventory item) not found")
+        item.qty_on_hand = max(0.0, item.qty_on_hand - body.amount)
+        if dose.cost is None and item.cost_per_unit is not None:
+            dose.cost = round(body.amount * item.cost_per_unit, 2)
+        session.add(item)
+
+    session.add(dose)
+    session.commit()
+    session.refresh(dose)
+    return dose
+
+
+@router.get("/{pool_id}/doses")
+def list_doses(
+    pool_id: int,
+    start: Optional[datetime] = None,
+    end: Optional[datetime] = None,
+    session: Session = Depends(get_session),
+):
+    _get_pool(pool_id, session)
+    q = select(DoseLog).where(DoseLog.pool_id == pool_id)
+    if start:
+        q = q.where(DoseLog.applied_at >= start)
+    if end:
+        q = q.where(DoseLog.applied_at <= end)
+    return session.exec(q.order_by(DoseLog.applied_at)).all()
+
+
+@router.get("/{pool_id}/consumption")
+def consumption(
+    pool_id: int,
+    start: Optional[datetime] = None,
+    end: Optional[datetime] = None,
+    session: Session = Depends(get_session),
+):
+    _get_pool(pool_id, session)
+    q = select(DoseLog).where(DoseLog.pool_id == pool_id)
+    if start:
+        q = q.where(DoseLog.applied_at >= start)
+    if end:
+        q = q.where(DoseLog.applied_at <= end)
+    rows = session.exec(q).all()
+
+    agg: dict[tuple[str, str], dict] = {}
+    for d in rows:
+        key = (d.chemical, d.unit)
+        a = agg.setdefault(key, {"chemical": d.chemical, "unit": d.unit,
+                                 "total_amount": 0.0, "total_cost": 0.0, "count": 0})
+        a["total_amount"] += d.amount
+        a["total_cost"] += d.cost or 0.0
+        a["count"] += 1
+
+    items = [
+        {**a, "total_amount": round(a["total_amount"], 2), "total_cost": round(a["total_cost"], 2)}
+        for a in agg.values()
+    ]
+    items.sort(key=lambda a: a["total_cost"], reverse=True)
+    return {"items": items, "total_cost": round(sum(a["total_cost"] for a in items), 2)}

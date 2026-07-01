@@ -86,3 +86,48 @@ class PoolUpdate(BaseModel):
     chlorine_source: Optional[str] = None
     uses_salt: Optional[bool] = None
     uses_borates: Optional[bool] = None
+
+
+class TestLogCreate(BaseModel):
+    taken_at: Optional[datetime] = None
+    fc: Optional[float] = None
+    cc: Optional[float] = None
+    ph: Optional[float] = None
+    ta: Optional[float] = None
+    ch: Optional[float] = None
+    cya: Optional[float] = None
+    salt: Optional[float] = None
+    borate: Optional[float] = None
+    water_temp_f: Optional[float] = None
+    tds: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class ChemicalCreate(BaseModel):
+    name: str
+    strength: Optional[str] = None
+    unit: str
+    qty_on_hand: float = 0.0
+    cost_per_unit: Optional[float] = None
+
+
+class ChemicalUpdate(BaseModel):
+    name: Optional[str] = None
+    strength: Optional[str] = None
+    unit: Optional[str] = None
+    qty_on_hand: Optional[float] = None
+    cost_per_unit: Optional[float] = None
+
+
+class DoseLogCreate(BaseModel):
+    applied_at: Optional[datetime] = None
+    chemical: str
+    strength: Optional[str] = None
+    amount: float
+    unit: str
+    parameter_targeted: Optional[str] = None
+    from_value: Optional[float] = None
+    to_value: Optional[float] = None
+    cost: Optional[float] = None
+    test_log_id: Optional[int] = None
+    chemical_id: Optional[int] = None  # optional inventory item to decrement
