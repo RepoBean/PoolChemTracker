@@ -4,6 +4,7 @@ import { usePools } from "../state/PoolContext";
 import { NoPool } from "../components/Empty";
 import { Button, Card, ErrorText, NumberField, SelectField } from "../components/ui";
 import { prettyUnit } from "../lib/format";
+import { convertUnit, unitOptions } from "../lib/units";
 import type { Chemical, DoseResult, TestLog } from "../types";
 
 const PARAMS = [
@@ -52,6 +53,7 @@ export default function Dosing() {
   const [invId, setInvId] = useState("");
   const [latest, setLatest] = useState<TestLog | null>(null);
   const [logged, setLogged] = useState(false);
+  const [unit, setUnit] = useState("");  // display/log unit for the result (fl oz, gal, …)
 
   useEffect(() => {
     if (!current) return;
@@ -68,11 +70,38 @@ export default function Dosing() {
     setLogged(false);
   }, [param]);
 
+  // Auto-calculate as the form is filled in (debounced) — no button to press.
+  useEffect(() => {
+    if (!current || cur == null || goal == null) {
+      setResult(null);
+      return;
+    }
+    const body: Record<string, unknown> = {
+      parameter: param, chemical, current: cur, goal,
+      volume_gal: volume ?? current.volume_gal, strength,
+    };
+    if (param === "ph") body.total_alkalinity = ta;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.dose(body)
+        .then((r) => { if (!cancelled) { setResult(r); setErr(null); setLogged(false); } })
+        .catch((e) => { if (!cancelled) { setErr(String(e)); setResult(null); } });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [current, param, chemical, cur, goal, ta, strength, volume]);
+
   if (!current) return <NoPool />;
 
   const showStrengthNumber = ["liquid_chlorine", "cal_hypo", "dichlor", "muriatic_acid"].includes(chemical);
   const showForm = chemical === "calcium_chloride";
   const needsTa = param === "ph";
+
+  // The dose is computed in fl oz / oz; let the user view + log it in the unit
+  // they buy in (e.g. gallons). Falls back to the computed unit.
+  const roundAmt = (x: number) => Math.round(x * 100) / 100;
+  const unitOpts = result ? unitOptions(result.unit) : [];
+  const dispUnit = result && unitOpts.includes(unit) ? unit : result?.unit ?? "";
+  const dispAmount = result ? convertUnit(result.amount, result.unit, dispUnit) ?? result.amount : 0;
 
   function pickChemical(c: string) {
     setChemical(c);
@@ -87,26 +116,11 @@ export default function Dosing() {
     if (latest && latest.ta != null) setTa(Number(latest.ta));
   }
 
-  async function compute() {
-    setErr(null);
-    setLogged(false);
-    try {
-      const body: Record<string, unknown> = {
-        parameter: param, chemical, current: cur ?? 0, goal: goal ?? 0,
-        volume_gal: volume ?? current!.volume_gal, strength,
-      };
-      if (needsTa) body.total_alkalinity = ta;
-      setResult(await api.dose(body));
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
-
   async function logDose() {
     if (!result) return;
     try {
       await api.logDose(current!.id, {
-        chemical: result.chemical, amount: result.amount, unit: result.unit,
+        chemical: result.chemical, amount: roundAmt(dispAmount), unit: dispUnit,
         parameter_targeted: param, from_value: cur, to_value: goal,
         chemical_id: invId ? Number(invId) : null,
       });
@@ -144,7 +158,7 @@ export default function Dosing() {
           <NumberField label="Volume" unit="gal" step="100" value={volume} onChange={setVolume} />
         </div>
         <ErrorText msg={err} />
-        <Button className="w-full" onClick={compute}>Calculate dose</Button>
+        <p className="text-xs text-slate-400">Enter a current and goal value — the dose updates automatically.</p>
       </Card>
 
       {result && (
@@ -152,9 +166,18 @@ export default function Dosing() {
           {result.amount > 0 ? (
             <div className="text-center">
               <div className="text-4xl font-bold text-sky-700">
-                {result.amount} <span className="text-lg font-normal">{prettyUnit(result.unit)}</span>
+                {roundAmt(dispAmount)} <span className="text-lg font-normal">{prettyUnit(dispUnit)}</span>
               </div>
-              <div className="text-sm text-slate-500">{result.chemical.replace(/_/g, " ")}</div>
+              {unitOpts.length > 1 && (
+                <div className="mt-1 text-sm text-slate-500">
+                  show in{" "}
+                  <select value={dispUnit} onChange={(e) => setUnit(e.target.value)}
+                    className="border border-slate-300 rounded-lg px-1.5 py-0.5 text-sm">
+                    {unitOpts.map((u) => <option key={u} value={u}>{prettyUnit(u)}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="text-sm text-slate-500 mt-1">{result.chemical.replace(/_/g, " ")}</div>
             </div>
           ) : (
             <div className="text-center text-slate-600">{result.note || "No chemical addition needed."}</div>

@@ -50,6 +50,41 @@ def test_inventory_dose_decrement_and_cost(client):
     assert client.get(f"/api/pools/{pid}/chemicals").json()[0]["qty_on_hand"] == 96
 
 
+def test_convert_units():
+    from poolmath.units import convert
+    assert convert(1, "gal", "fl_oz") == pytest.approx(128)
+    assert convert(64, "fl_oz", "gal") == pytest.approx(0.5)
+    assert convert(1, "lb", "oz") == pytest.approx(16)
+    assert convert(5, "fl_oz", "fl_oz") == 5
+    assert convert(1, "gal", "lb") is None  # volume vs weight — incompatible
+
+
+def test_dose_in_floz_against_gallon_jug(client):
+    # Buy chlorine in 2.5-gal jugs at $4/gal; a dose computed in fl oz must
+    # decrement gallons and price correctly, not subtract fl oz from gallons.
+    pid = _make_pool(client)
+    inv = client.post(f"/api/pools/{pid}/chemicals", json={
+        "name": "Liquid chlorine", "unit": "gal", "qty_on_hand": 2.5, "cost_per_unit": 4.0,
+    }).json()
+    dose = client.post(f"/api/pools/{pid}/doses", json={
+        "chemical": "liquid_chlorine", "amount": 64, "unit": "fl_oz",  # 0.5 gal
+        "parameter_targeted": "fc", "chemical_id": inv["id"],
+    }).json()
+    assert dose["cost"] == pytest.approx(2.0)  # 0.5 gal * $4
+    assert client.get(f"/api/pools/{pid}/chemicals").json()[0]["qty_on_hand"] == pytest.approx(2.0)
+
+
+def test_dose_incompatible_units_rejected(client):
+    pid = _make_pool(client)
+    inv = client.post(f"/api/pools/{pid}/chemicals", json={
+        "name": "Cal-hypo", "unit": "lb", "qty_on_hand": 5,
+    }).json()
+    r = client.post(f"/api/pools/{pid}/doses", json={
+        "chemical": "x", "amount": 64, "unit": "fl_oz", "chemical_id": inv["id"],
+    })
+    assert r.status_code == 422
+
+
 def test_timestamps_serialized_as_utc(client):
     # Naive UTC stored in SQLite must serialize with an explicit offset, or the
     # browser's new Date() parses it as local time and shifts every timestamp.

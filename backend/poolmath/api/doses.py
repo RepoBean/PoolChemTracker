@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..models import Chemical, DoseLog, DoseLogCreate, Pool
+from ..units import convert
 
 router = APIRouter(prefix="/api/pools", tags=["doses"])
 
@@ -28,14 +29,23 @@ def create_dose(pool_id: int, body: DoseLogCreate, session: Session = Depends(ge
     if body.applied_at:
         dose.applied_at = body.applied_at
 
-    # Optionally draw down inventory and derive cost.
+    # Optionally draw down inventory and derive cost. The dose and the inventory
+    # item may use different units (dose in fl oz, jug tracked in gal), so convert
+    # into the item's unit before decrementing and pricing.
     if body.chemical_id is not None:
         item = session.get(Chemical, body.chemical_id)
         if not item or item.pool_id != pool_id:
             raise HTTPException(404, "chemical (inventory item) not found")
-        item.qty_on_hand = max(0.0, item.qty_on_hand - body.amount)
+        used = convert(body.amount, body.unit, item.unit)
+        if used is None:
+            raise HTTPException(
+                422,
+                f"dose is in {body.unit} but '{item.name}' is tracked in {item.unit}; "
+                "those units aren't compatible",
+            )
+        item.qty_on_hand = max(0.0, item.qty_on_hand - used)
         if dose.cost is None and item.cost_per_unit is not None:
-            dose.cost = round(body.amount * item.cost_per_unit, 2)
+            dose.cost = round(used * item.cost_per_unit, 2)
         session.add(item)
 
     session.add(dose)

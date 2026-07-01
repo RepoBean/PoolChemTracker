@@ -3,9 +3,21 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 import { api } from "../api";
 import { usePools } from "../state/PoolContext";
 import { NoPool } from "../components/Empty";
-import { Button, Card, ErrorText, NumberField, TextField } from "../components/ui";
+import { Button, Card, ErrorText, NumberField, SelectField, TextField } from "../components/ui";
 import { money, prettyUnit } from "../lib/format";
 import type { Chemical, ConsumptionItem, DoseLog } from "../types";
+
+const UNIT_CHOICES = [
+  { value: "gal", label: "Gallons (gal)" },
+  { value: "quart", label: "Quarts (qt)" },
+  { value: "fl_oz", label: "Fluid ounces (fl oz)" },
+  { value: "l", label: "Liters (L)" },
+  { value: "ml", label: "Milliliters (mL)" },
+  { value: "lb", label: "Pounds (lb)" },
+  { value: "oz_wt", label: "Ounces, weight (oz)" },
+  { value: "kg", label: "Kilograms (kg)" },
+  { value: "g", label: "Grams (g)" },
+];
 
 export default function Consumption() {
   const { current } = usePools();
@@ -135,10 +147,13 @@ export default function Consumption() {
             ))}
             <div className="grid grid-cols-2 gap-2 pt-2">
               <TextField label="Name" value={name} onChange={setName} placeholder="12.5% liquid chlorine" />
-              <TextField label="Unit" value={unit} onChange={setUnit} />
-              <NumberField label="Qty on hand" value={qty} onChange={setQty} />
-              <NumberField label="$ / unit" value={cost} step="0.01" onChange={setCost} />
+              <SelectField label="Unit" value={unit} onChange={setUnit} options={UNIT_CHOICES} />
+              <NumberField label="Qty on hand" value={qty} min={0} onChange={setQty} />
+              <NumberField label="$ / unit" value={cost} step="0.01" min={0} onChange={setCost} />
             </div>
+            <p className="text-xs text-slate-400">
+              Cost is per unit — a $10 jug of 2.5 gal is <b>$4.00</b> per gal (10 ÷ 2.5).
+            </p>
             <ErrorText msg={err} />
             <Button variant="ghost" className="w-full" onClick={addChem} disabled={!name}>Add chemical</Button>
           </Card>

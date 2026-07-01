@@ -7,6 +7,13 @@ const UNIT_LABELS: Record<string, string> = {
   lb: "lb",
   ppm: "ppm",
   gal: "gal",
+  cup: "cup",
+  pint: "pt",
+  quart: "qt",
+  ml: "mL",
+  l: "L",
+  g: "g",
+  kg: "kg",
 };
 
 export function prettyUnit(u: string | null | undefined): string {
