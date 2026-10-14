@@ -23,6 +23,24 @@ Ordered milestones. Chemistry first (done) because it de-risks everything.
    static), compose + `./data` volume, README polish → `/opt/docker/poolmath`.
    ✅ *(image + compose + `.dockerignore` + README built and container
    smoke-tested; deploy to `/opt/docker/poolmath` pending approval)*
+8. **Quick (categorical) tests** ✅ *(prompt-improvements task 1)*
+   - `TestLog` gains `test_type` / `fc_color` (OTO 5-drop steps) / `ph_quick`
+     (7.2–8.4 chips); numeric `fc`/`ph` derived for charting, `is_approx`
+     computed field; no-CYA quick tests still get the FC<1 add-chlorine dose;
+     startup `ALTER TABLE` guard for existing DBs.
+   - Frontend: Full/Quick toggle (remembers last mode), tappable OTO swatches,
+     one-tap save, hollow approx markers on Trends.
+9. **Receipt ingestion via local vision model** ✅ *(prompt-improvements task 2)*
+   - `POST …/receipts` (draft parse, Ollama `/api/chat`, stdlib urllib, 10 MB
+     cap, unit normalization incl. bare-"oz" dry/liquid rule) → review form →
+     `POST …/receipts/confirm` (inventory qty/cost update, `ReceiptLog`,
+     image stored only on confirm). Env-gated (`POOLMATH_VLM_URL`), off by
+     default: 503 + hidden button + `/api/ai/status`.
+10. **Consumption aggregation fix** ✅ *(prompt-improvements task 3)*
+    - `/consumption`: one row per chemical in a single base unit (inventory
+      item's unit, else highest-cost dose's unit); `POST /doses` with
+      `chemical_id` normalizes to the inventory item's canonical
+      name/strength; endpoint tests added.
 
 ## v1.1
 - **MQTT → Home Assistant**: publish latest readings + targets to Mosquitto.
