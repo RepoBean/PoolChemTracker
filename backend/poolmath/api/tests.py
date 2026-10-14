@@ -32,7 +32,7 @@ def _recommendation(t: TestLog, pool: Pool, targets) -> Optional[dict]:
     if t.fc is None or targets is None:
         # Quick tests skip CYA (and CH/TA/temp — those only gate CSI), so there
         # are no CYA-derived targets. Fall back to TFP's universal "FC ≥ 1.0"
-        # rule so a no-color OTO result still gets a chlorine dose, not silence.
+        # rule so a no-color OCT result still gets a chlorine dose, not silence.
         if (t.test_type == "quick" and t.fc is not None
                 and t.fc < tfp.MIN_FC_NO_CYA):
             dose = chem.dose_fc_liquid_chlorine(tfp.MIN_FC_NO_CYA - t.fc, pool.volume_gal, 12.5)
@@ -74,8 +74,8 @@ def create_test(pool_id: int, body: TestLogCreate, session: Session = Depends(ge
     if body.taken_at:
         test.taken_at = body.taken_at
     # Quick tests record a color, not a number. Derive chartable values from
-    # the OTO swatch step (lower bound) / coarse pH chip so trends can plot
-    # them; both the raw category and the derived number are kept.
+    # the OCT swatch step (lower bound) / pH mark so trends can plot them;
+    # both the raw category and the derived number are kept.
     if test.fc is None and test.fc_color is not None:
         test.fc = FC_COLOR_STEPS[test.fc_color]
     if test.ph is None and test.ph_quick is not None:

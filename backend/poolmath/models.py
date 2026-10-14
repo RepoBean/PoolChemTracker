@@ -11,15 +11,26 @@ from sqlmodel import Field, SQLModel
 
 
 # --- Quick (categorical) test vocabulary -----------------------------------
-# OTO 5-drop swatch steps -> numeric FC lower bound used for charting and
-# targeting. "none" (no color change) means FC < 0.5, so it maps to 0.0.
+# Quick-test colors match the Taylor #5113 "Pool & Spa Water Tests" kit:
+#   R-0600 Orthotolidine (OCT)  -> Total Chlorine / Total Bromine (5 drops)
+#   R-0014 phenol red           -> pH
+# Each OCT swatch is keyed by the lower number printed on its color band and
+# maps to that numeric value so quick readings can be charted and targeted.
+# "none" (no color change) means no detectable chlorine -> 0.0. NOTE: OCT reads
+# *total* chlorine, which equals free chlorine when CC is ~0 (e.g. a SLAM), so
+# it is stored as `fc` and used for the same FC targeting.
 FC_COLOR_STEPS: dict[str, float] = {
-    "none": 0.0, "0.5": 0.5, "1": 1.0, "2": 2.0, "3": 3.0, "5": 5.0, "10": 10.0,
-    "15": 15.0, "20": 20.0, "30": 30.0, "40": 40.0, "50": 50.0, "100": 100.0,
+    "none": 0.0,   # no color change          (< 0.5)
+    "0.5": 0.5,    # faint yellow             (0.5-1)
+    "1": 1.0,      # pale yellow              (1-2)
+    "2": 2.0,      # yellow                   (2-4)
+    "3": 3.0,      # yellow-green             (3-6)
+    "5": 5.0,      # green                    (5-10)
+    "10": 10.0,    # off-chart / orange        (> 10)
 }
-# Coarse pH chip values (test-strip / drop resolution).
+# pH marks printed on the R-0014 phenol red chart.
 PH_QUICK_VALUES: tuple[str, ...] = (
-    "7.2", "7.4", "7.6", "7.8", "8.0", "8.2", "8.4",
+    "6.8", "7.2", "7.5", "7.8", "8.2",
 )
 
 
@@ -70,13 +81,13 @@ class TestLog(SQLModel, table=True):
     csi: Optional[float] = None           # computed on save
     notes: Optional[str] = None
     test_type: str = "full"               # "full" | "quick" (categorical)
-    fc_color: Optional[str] = None        # OTO 5-drop swatch step (FC_COLOR_STEPS)
-    ph_quick: Optional[str] = None        # coarse pH chip, 7.2..8.4 step 0.2
+    fc_color: Optional[str] = None        # OCT 5-drop swatch step (FC_COLOR_STEPS)
+    ph_quick: Optional[str] = None        # pH mark from the R-0014 chart (PH_QUICK_VALUES)
 
     @computed_field
     @property
     def is_approx(self) -> bool:
-        """True for categorical readings (quick mode or an OTO color step) so the
+        """True for categorical readings (quick mode or an OCT color step) so the
         UI can mark them as approximate on charts. Derived — not a column."""
         return self.test_type == "quick" or self.fc_color is not None
 
@@ -170,8 +181,8 @@ class TestLogCreate(BaseModel):
     tds: Optional[float] = None
     notes: Optional[str] = None
     test_type: str = "full"               # "full" | "quick"
-    fc_color: Optional[str] = None        # OTO 5-drop swatch step
-    ph_quick: Optional[str] = None        # coarse pH chip
+    fc_color: Optional[str] = None        # OCT 5-drop swatch step (Taylor #5113)
+    ph_quick: Optional[str] = None        # pH mark (6.8, 7.2, 7.5, 7.8, 8.2)
 
     @field_validator("test_type")
     @classmethod
@@ -191,7 +202,7 @@ class TestLogCreate(BaseModel):
     @classmethod
     def _check_ph_quick(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v not in PH_QUICK_VALUES:
-            raise ValueError("ph_quick must be 7.2..8.4 in 0.2 steps")
+            raise ValueError(f"ph_quick must be one of: {', '.join(PH_QUICK_VALUES)}")
         return v
 
 

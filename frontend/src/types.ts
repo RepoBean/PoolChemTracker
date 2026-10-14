@@ -29,8 +29,8 @@ export interface TestLog {
   csi?: number | null;
   notes?: string | null;
   test_type?: string | null;   // "full" | "quick"
-  fc_color?: string | null;    // OTO 5-drop swatch step: none|0.5|1|2|3|5|10|15|20|30|40|50|100
-  ph_quick?: string | null;    // coarse pH chip 7.2..8.4
+  fc_color?: string | null;    // OCT 5-drop swatch step (Taylor #5113): none|0.5|1|2|3|5|10
+  ph_quick?: string | null;    // pH mark on the R-0014 chart: 6.8|7.2|7.5|7.8|8.2
   is_approx?: boolean;         // categorical reading -> mark approximate on charts
 }
 

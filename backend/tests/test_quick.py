@@ -1,4 +1,5 @@
-"""Quick (categorical color) tests: OTO 5-drop FC swatches + coarse pH chips."""
+"""Quick (categorical color) tests: OCT 5-drop chlorine swatches + pH marks
+matching the Taylor #5113 Pool & Spa Water Tests kit."""
 
 import pytest
 from sqlmodel import Session, create_engine
@@ -15,7 +16,7 @@ def _make_pool(client, **kw) -> int:
 
 @pytest.mark.parametrize("color", list(FC_COLOR_STEPS))
 def test_quick_fc_color_derives_lower_bound(client, color):
-    """Each OTO step maps to its numeric lower bound ('none' -> 0.0)."""
+    """Each OCT swatch maps to its numeric lower bound ('none' -> 0.0)."""
     pid = _make_pool(client)
     body = client.post(f"/api/pools/{pid}/tests", json={
         "test_type": "quick", "fc_color": color,
@@ -68,10 +69,10 @@ def test_quick_mid_scale_no_recommendation_without_cya(client):
 def test_quick_ph_chip_derives_numeric_ph(client):
     pid = _make_pool(client)
     body = client.post(f"/api/pools/{pid}/tests", json={
-        "test_type": "quick", "ph_quick": "7.6",
+        "test_type": "quick", "ph_quick": "7.5",
     }).json()
-    assert body["test"]["ph"] == 7.6
-    assert body["test"]["ph_quick"] == "7.6"
+    assert body["test"]["ph"] == 7.5
+    assert body["test"]["ph_quick"] == "7.5"
     assert body["test"]["is_approx"] is True
 
 
