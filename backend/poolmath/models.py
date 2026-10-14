@@ -5,8 +5,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, computed_field, field_serializer, field_validator
 from sqlmodel import Field, SQLModel
+
+
+# --- Quick (categorical) test vocabulary -----------------------------------
+# OTO 5-drop swatch steps -> numeric FC lower bound used for charting and
+# targeting. "none" (no color change) means FC < 0.5, so it maps to 0.0.
+FC_COLOR_STEPS: dict[str, float] = {
+    "none": 0.0, "0.5": 0.5, "1": 1.0, "2": 2.0, "3": 3.0, "5": 5.0, "10": 10.0,
+    "15": 15.0, "20": 20.0, "30": 30.0, "40": 40.0, "50": 50.0, "100": 100.0,
+}
+# Coarse pH chip values (test-strip / drop resolution).
+PH_QUICK_VALUES: tuple[str, ...] = (
+    "7.2", "7.4", "7.6", "7.8", "8.0", "8.2", "8.4",
+)
 
 
 def utcnow() -> datetime:
@@ -55,6 +68,16 @@ class TestLog(SQLModel, table=True):
     tds: Optional[float] = None
     csi: Optional[float] = None           # computed on save
     notes: Optional[str] = None
+    test_type: str = "full"               # "full" | "quick" (categorical)
+    fc_color: Optional[str] = None        # OTO 5-drop swatch step (FC_COLOR_STEPS)
+    ph_quick: Optional[str] = None        # coarse pH chip, 7.2..8.4 step 0.2
+
+    @computed_field
+    @property
+    def is_approx(self) -> bool:
+        """True for categorical readings (quick mode or an OTO color step) so the
+        UI can mark them as approximate on charts. Derived — not a column."""
+        return self.test_type == "quick" or self.fc_color is not None
 
     @field_serializer("taken_at")
     def _ser_taken_at(self, v: datetime) -> str:
@@ -123,6 +146,30 @@ class TestLogCreate(BaseModel):
     water_temp_f: Optional[float] = None
     tds: Optional[float] = None
     notes: Optional[str] = None
+    test_type: str = "full"               # "full" | "quick"
+    fc_color: Optional[str] = None        # OTO 5-drop swatch step
+    ph_quick: Optional[str] = None        # coarse pH chip
+
+    @field_validator("test_type")
+    @classmethod
+    def _check_test_type(cls, v: str) -> str:
+        if v not in ("full", "quick"):
+            raise ValueError("test_type must be 'full' or 'quick'")
+        return v
+
+    @field_validator("fc_color")
+    @classmethod
+    def _check_fc_color(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in FC_COLOR_STEPS:
+            raise ValueError(f"fc_color must be one of: {', '.join(FC_COLOR_STEPS)}")
+        return v
+
+    @field_validator("ph_quick")
+    @classmethod
+    def _check_ph_quick(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in PH_QUICK_VALUES:
+            raise ValueError("ph_quick must be 7.2..8.4 in 0.2 steps")
+        return v
 
 
 class ChemicalCreate(BaseModel):

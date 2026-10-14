@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from .. import chemistry as chem
+from .. import tfp_data as tfp
 from ..db import get_session
-from ..models import Pool, TestLog, TestLogCreate
+from ..models import FC_COLOR_STEPS, Pool, TestLog, TestLogCreate
 
 router = APIRouter(prefix="/api/pools", tags=["tests"])
 
@@ -29,6 +30,16 @@ def _recommendation(t: TestLog, pool: Pool, targets) -> Optional[dict]:
     if t.cc is not None and t.cc > 0.5:
         return {"level": "warn", "message": "CC > 0.5 — investigate; SLAM if algae or FC lost overnight."}
     if t.fc is None or targets is None:
+        # Quick tests skip CYA (and CH/TA/temp — those only gate CSI), so there
+        # are no CYA-derived targets. Fall back to TFP's universal "FC ≥ 1.0"
+        # rule so a no-color OTO result still gets a chlorine dose, not silence.
+        if (t.test_type == "quick" and t.fc is not None
+                and t.fc < tfp.MIN_FC_NO_CYA):
+            dose = chem.dose_fc_liquid_chlorine(tfp.MIN_FC_NO_CYA - t.fc, pool.volume_gal, 12.5)
+            return {"level": "danger",
+                    "message": f"FC {t.fc} is BELOW minimum ({tfp.MIN_FC_NO_CYA:g}). "
+                               f"Add ~{dose.amount} {dose.unit} of 12.5% liquid chlorine.",
+                    "dose": dose}
         return None
     if t.fc < targets.min_fc:
         goal = (targets.target_fc_low + targets.target_fc_high) / 2
@@ -62,6 +73,13 @@ def create_test(pool_id: int, body: TestLogCreate, session: Session = Depends(ge
     test = TestLog(pool_id=pool_id, **fields)
     if body.taken_at:
         test.taken_at = body.taken_at
+    # Quick tests record a color, not a number. Derive chartable values from
+    # the OTO swatch step (lower bound) / coarse pH chip so trends can plot
+    # them; both the raw category and the derived number are kept.
+    if test.fc is None and test.fc_color is not None:
+        test.fc = FC_COLOR_STEPS[test.fc_color]
+    if test.ph is None and test.ph_quick is not None:
+        test.ph = float(test.ph_quick)
     test.csi = _compute_csi(test)
     session.add(test)
     session.commit()

@@ -15,7 +15,7 @@ const RANGES = [
 interface Band { y1: number; y2: number }
 
 function ChartCard({
-  title, data, dataKey, color, band, domain, multi,
+  title, data, dataKey, color, band, domain, multi, approx,
 }: {
   title: string;
   data: Record<string, unknown>[];
@@ -24,10 +24,25 @@ function ChartCard({
   band?: Band;
   domain?: [number, number];
   multi?: boolean;
+  approx?: boolean; // render quick-test points hollow (○)
 }) {
+  // Quick (categorical) tests plot as hollow markers, precise ones filled.
+  const approxDot = (p: { cx?: number; cy?: number; payload?: Record<string, unknown>; key?: string | number }) => {
+    const { cx, cy, payload } = p;
+    if (cx == null || cy == null || payload?.[dataKey ?? ""] == null) return <g key={p.key} />;
+    const hollow = Boolean(payload.is_approx);
+    return (
+      <circle key={p.key} cx={cx} cy={cy} r={hollow ? 3.5 : 2}
+        fill={hollow ? "#ffffff" : color} stroke={color} strokeWidth={1.5} />
+    );
+  };
+
   return (
     <Card>
-      <div className="text-sm font-medium mb-2">{title}</div>
+      <div className="text-sm font-medium mb-2 flex items-baseline gap-2">
+        <span>{title}</span>
+        {approx && <span className="text-xs font-normal text-slate-400">○ = quick test (approx)</span>}
+      </div>
       <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
@@ -42,7 +57,8 @@ function ChartCard({
               <Line type="monotone" dataKey="cya" stroke="#a855f7" dot={false} name="CYA" connectNulls />
             </>
           ) : (
-            <Line type="monotone" dataKey={dataKey} stroke={color} dot={{ r: 2 }} connectNulls />
+            <Line type="monotone" dataKey={dataKey} stroke={color}
+              dot={approx ? approxDot : { r: 2 }} connectNulls />
           )}
         </LineChart>
       </ResponsiveContainer>
@@ -78,6 +94,7 @@ export default function Trends() {
       t: new Date(t.taken_at).toLocaleDateString(undefined, { month: "numeric", day: "numeric" }),
       fc: t.fc ?? undefined, ph: t.ph ?? undefined, csi: t.csi ?? undefined,
       ta: t.ta ?? undefined, ch: t.ch ?? undefined, cya: t.cya ?? undefined,
+      is_approx: t.is_approx ?? false,
     }));
 
   return (
@@ -98,9 +115,10 @@ export default function Trends() {
         <Card>No tests in this range.</Card>
       ) : (
         <div className="grid lg:grid-cols-2 gap-4">
-          <ChartCard title="Free Chlorine (ppm)" data={data} dataKey="fc" color="#0284c7"
+          <ChartCard title="Free Chlorine (ppm)" data={data} dataKey="fc" color="#0284c7" approx
             band={targets ? { y1: targets.target_fc_low, y2: targets.target_fc_high } : undefined} />
-          <ChartCard title="pH" data={data} dataKey="ph" color="#7c3aed" band={{ y1: 7.6, y2: 7.8 }} domain={[6.8, 8.2]} />
+          <ChartCard title="pH" data={data} dataKey="ph" color="#7c3aed" approx
+            band={{ y1: 7.6, y2: 7.8 }} domain={[6.8, 8.2]} />
           <ChartCard title="CSI" data={data} dataKey="csi" color="#059669" band={{ y1: -0.3, y2: 0.3 }} domain={[-1, 1]} />
           <ChartCard title="TA / CH / CYA (ppm)" data={data} multi />
         </div>

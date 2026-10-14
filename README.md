@@ -36,7 +36,7 @@ Requires [`uv`](https://docs.astral.sh/uv/) (gets Python 3.13 automatically).
 ```bash
 uv venv --python 3.13
 uv pip install -e "backend[dev]"
-uv run pytest backend/tests -q       # 47 chemistry tests
+uv run pytest backend/tests -q       # chemistry + API tests
 ```
 
 ## Deploy (Docker)
@@ -87,6 +87,7 @@ ZFS-snapshotted with the rest of `/opt/docker`.
 - [x] Chemistry engine + TFP validation tests
 - [x] Pool CRUD + volume estimator
 - [x] Test logging + targets + dosing endpoints
+- [x] Quick (categorical) tests — OTO 5-drop FC swatches + coarse pH chips
 - [x] Dose logging + consumption tracking
 - [x] Frontend (dashboard, log, dosing, trends)
 - [x] PWA + Docker image (multi-stage, compose stack)

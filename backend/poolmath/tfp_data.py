@@ -39,6 +39,10 @@ SLAM_FC: dict[int, int] = {
     20: 10, 30: 12, 40: 16, 50: 20, 60: 24, 70: 28, 80: 31, 90: 35, 100: 39,
 }
 
+# Universal maintenance minimum when CYA is unknown/unstabilized: TFP's
+# "keep FC at 1.0" rule (the FC/CYA chart starts at CYA 20).
+MIN_FC_NO_CYA = 1.0
+
 MUSTARD_SLAM_FACTOR = 0.60  # mustard/yellow-algae SLAM ≈ 0.6 × CYA
 SLAM_FACTOR = 0.40          # continuous SLAM ≈ 0.4 × CYA (floor 10) outside the table
 
