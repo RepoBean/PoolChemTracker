@@ -10,12 +10,6 @@ consumption, and see trends over time. Runs entirely on your own hardware.
 > guidance (see [`docs/tfp-reference.md`](docs/tfp-reference.md)). Always
 > validate a dose against your own test kit before trusting it poolside.
 
-## Why this exists
-
-Replaces the paid PoolMath app for personal/family use, adds better **chemical
-consumption/cost tracking**, and can publish to **Home Assistant** (MQTT).
-Self-hosted, single Docker stack, no cloud, no account required.
-
 ## Chemistry engine
 
 The chemistry is the hard part, so it's isolated in
