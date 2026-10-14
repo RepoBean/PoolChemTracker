@@ -93,3 +93,40 @@ Resolved decisions for this build (spec §10 and beyond). Newest context wins.
   `PRAGMA table_info` per (table, column) and `ALTER TABLE … ADD COLUMN` when
   missing. A test simulates a pre-quick-test DB and exercises the path.
   Resetting the DB is *not* required.
+
+## Receipt scanning (local VLM)
+- **Target is Ollama's `/api/chat`**, image base64 in `messages[0].images`,
+  `format` = JSON schema for the item list. Why Ollama: d3050 already runs
+  Docker, one `ollama pull` away, zero new infra, and it's the most common
+  self-hosted vision runtime. `POOLMATH_VLM_URL` is env-gated and **off by
+  default**; with it unset the scan endpoint 503s, `/api/ai/status` reports
+  `{enabled: false}`, and the frontend hides the button — the rest of the app
+  is byte-for-byte unchanged.
+- **HTTP client is stdlib `urllib`** — `httpx` is a *dev-only* dependency
+  (pytest/TestClient) and adding it at runtime was avoided. `python-multipart`
+  *is* a new regular dependency: FastAPI's form/file handling requires it and
+  there is no stdlib workaround (small, FastAPI-endorsed).
+- **Two-phase, human-in-the-loop:** `POST …/receipts` returns a *draft* and
+  writes nothing; `POST …/receipts/confirm` (multipart: `items` JSON form
+  field + `received_at` + optional re-uploaded image) merges into `Chemical`
+  and persists a `ReceiptLog`. The image is re-uploaded on confirm rather than
+  cached server-side — stateless parse, and **discarded scans store nothing**.
+- **Image storage policy:** only on confirm, under `<POOLMATH_DB_PATH
+dir>/receipts/<utc-timestamp>.<ext>` (i.e. inside the bind-mounted, ZFS-
+  snapshotted volume alongside the DB). Bad extension/oversize at confirm =
+  skip storage, still log the receipt.
+- **Confirm-merge rules:** name match is case-insensitive and
+  whitespace-collapsed; if the item carries a strength, it must match too
+  (12.5% ≠ 6%). On match: `qty_on_hand += package_qty` and
+  `cost_per_unit = price / package_qty` (in the receipt's unit — the review
+  form is where a unit mismatch gets fixed; the backend does not silently
+  convert). No match → create the `Chemical` with the item's unit.
+- **Unit normalization** (`units.normalize_unit`): free-text words → the app's
+  unit set; bare "oz" is ambiguous — **oz_wt for dry/powder chemicals
+  (name heuristics: hypo, calcium/chloride, baking soda, stabilizer, cya,
+  salt, borax, …), fl_oz for liquids**. "chlor" alone is deliberately *not*
+  a dry hint (liquid pool chlorine). Unknown words pass through untouched.
+- **Dropping non-chemicals is the model's job** (prompt-instructed) with the
+  human review form as backstop; the code only drops nameless lines. Receipt
+  total vs item-sum mismatch is surfaced in the UI as a sanity hint, not an
+  error — receipts include tax.

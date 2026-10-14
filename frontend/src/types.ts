@@ -104,3 +104,30 @@ export interface ConsumptionItem {
   total_cost: number;
   count: number;
 }
+
+export interface AiStatus {
+  enabled: boolean;
+  model: string | null;
+}
+
+export interface ReceiptItem {
+  name: string;
+  strength?: string | null;
+  package_qty?: number | null;
+  unit: string;
+  price?: number | null;
+}
+
+export interface ReceiptDraft {
+  items: ReceiptItem[];
+  total?: number | null;
+  raw: string;
+}
+
+export interface ReceiptLogEntry {
+  id: number;
+  received_at: string;
+  image: string | null;
+  item_count: number;
+  total_cost: number;
+}

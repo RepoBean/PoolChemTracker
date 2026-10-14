@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -114,6 +115,28 @@ class Chemical(SQLModel, table=True):
     cost_per_unit: Optional[float] = None
 
 
+class ReceiptLog(SQLModel, table=True):
+    """Purchase history from confirmed receipt scans (or future manual entries)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pool_id: int = Field(foreign_key="pool.id", index=True)
+    received_at: datetime = Field(default_factory=utcnow, index=True)
+    image: Optional[str] = None        # path of the stored receipt image, or None
+    items_json: str = "[]"             # ReceiptItem[] at confirm time
+    total_cost: float = 0.0
+
+    @field_serializer("received_at")
+    def _ser_received_at(self, v: datetime) -> str:
+        return _iso_utc(v)
+
+    @computed_field
+    @property
+    def item_count(self) -> int:
+        try:
+            return len(json.loads(self.items_json))
+        except (ValueError, TypeError):
+            return 0
+
+
 # --- API schemas -----------------------------------------------------------
 class PoolCreate(BaseModel):
     name: str
@@ -200,3 +223,19 @@ class DoseLogCreate(BaseModel):
     cost: Optional[float] = None
     test_log_id: Optional[int] = None
     chemical_id: Optional[int] = None  # optional inventory item to decrement
+
+
+# --- Receipts (optional local-VLM ingestion) --------------------------------
+class ReceiptItem(BaseModel):
+    name: str
+    strength: Optional[str] = None        # e.g. "12.5%"
+    package_qty: Optional[float] = None   # qty of one package, e.g. 2.5
+    unit: str = "fl_oz"
+    price: Optional[float] = None         # USD for the package
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("name is required")
+        return v.strip()

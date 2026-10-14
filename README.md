@@ -72,7 +72,17 @@ mkdir -p data && sudo chown -R 1000:1000 data
 | `TZ` | `America/New_York` | Timezone for log timestamps |
 | `POOLMATH_DB_PATH` | `/data/poolmath.db` | SQLite location (inside the volume) |
 | `POOLMATH_AUTH_TOKEN` | *unset* | Set to require a shared token; unset = open on LAN |
+| `POOLMATH_VLM_URL` | *unset* | Ollama base URL for receipt scanning; unset = feature off |
+| `POOLMATH_VLM_MODEL` | `llama3.2-vision` | Vision model name for receipt scanning |
 | `MQTT_*` | *unset* | Home Assistant publish (wired up in a later phase) |
+
+**Receipt scanning (optional).** Point `POOLMATH_VLM_URL` at any Ollama
+instance that has a vision model (e.g. `ollama pull llama3.2-vision`) and a
+"Scan receipt" button appears on the Chemical usage page. Photograph a
+store receipt → the model parses it into an editable item list → confirm
+updates inventory quantities and cost-per-unit and leaves a purchase-history
+entry. Works with no model configured: everything is hidden and the rest of
+the app is unchanged. No cloud APIs — the model runs on your own hardware.
 
 **Reverse proxy.** `docker-compose.yml` publishes `8790:8790` on the LAN. To
 keep it off other interfaces and front it with a proxy on the same host, switch
@@ -88,6 +98,7 @@ ZFS-snapshotted with the rest of `/opt/docker`.
 - [x] Pool CRUD + volume estimator
 - [x] Test logging + targets + dosing endpoints
 - [x] Quick (categorical) tests — OTO 5-drop FC swatches + coarse pH chips
+- [x] Receipt scanning via local vision model (optional, off by default)
 - [x] Dose logging + consumption tracking
 - [x] Frontend (dashboard, log, dosing, trends)
 - [x] PWA + Docker image (multi-stage, compose stack)

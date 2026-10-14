@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, config
-from .api import chem, chemicals, doses, pools
+from .api import chem, chemicals, doses, pools, receipts
 from .api import tests as tests_api
 from .auth import require_auth
 from .db import init_db
@@ -38,6 +38,8 @@ app.include_router(pools.router, dependencies=_guard)
 app.include_router(tests_api.router, dependencies=_guard)
 app.include_router(doses.router, dependencies=_guard)
 app.include_router(chemicals.router, dependencies=_guard)
+app.include_router(receipts.router, dependencies=_guard)
+app.include_router(receipts.ai_router, dependencies=_guard)
 
 
 # Serve the built PWA (if present). Registered last so /api routes win. Any

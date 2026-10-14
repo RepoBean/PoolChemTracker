@@ -1,6 +1,6 @@
 import type {
-  Chemical, ConsumptionItem, DoseLog, DoseResult, LogTestResult, Pool, PoolDetail,
-  Targets, TestLog,
+  AiStatus, Chemical, ConsumptionItem, DoseLog, DoseResult, LogTestResult, Pool,
+  PoolDetail, ReceiptDraft, ReceiptItem, ReceiptLogEntry, Targets, TestLog,
 } from "./types";
 
 const BASE = "/api";
@@ -15,6 +15,16 @@ async function req<T>(path: string, opts?: RequestInit): Promise<T> {
     throw new Error(text || `${res.status} ${res.statusText}`);
   }
   if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+// multipart upload (no Content-Type — the browser sets the boundary)
+async function formReq<T>(path: string, fd: FormData): Promise<T> {
+  const res = await fetch(BASE + path, { method: "POST", body: fd });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -49,4 +59,20 @@ export const api = {
   listDoses: (id: number) => req<DoseLog[]>(`/pools/${id}/doses`),
   consumption: (id: number) =>
     req<{ items: ConsumptionItem[]; total_cost: number }>(`/pools/${id}/consumption`),
+
+  aiStatus: () => req<AiStatus>("/ai/status"),
+  scanReceipt: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return formReq<ReceiptDraft>(`/pools/${id}/receipts`, fd);
+  },
+  confirmReceipt: (id: number, items: ReceiptItem[], receivedAt: string | null, file: File | null) => {
+    const fd = new FormData();
+    fd.append("items", JSON.stringify(items));
+    if (receivedAt) fd.append("received_at", receivedAt);
+    if (file) fd.append("image", file);
+    return formReq<{ receipt: ReceiptLogEntry; items: { name: string; created: boolean }[] }>(
+      `/pools/${id}/receipts/confirm`, fd);
+  },
+  listReceipts: (id: number) => req<ReceiptLogEntry[]>(`/pools/${id}/receipts`),
 };

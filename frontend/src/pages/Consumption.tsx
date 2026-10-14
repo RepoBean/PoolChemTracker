@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api";
 import { usePools } from "../state/PoolContext";
 import { NoPool } from "../components/Empty";
 import { Button, Card, ErrorText, NumberField, SelectField, TextField } from "../components/ui";
 import { money, prettyUnit } from "../lib/format";
-import type { Chemical, ConsumptionItem, DoseLog } from "../types";
+import type { Chemical, ConsumptionItem, DoseLog, ReceiptDraft, ReceiptItem, ReceiptLogEntry } from "../types";
 
 const UNIT_CHOICES = [
   { value: "gal", label: "Gallons (gal)" },
@@ -25,12 +25,23 @@ export default function Consumption() {
   const [totalCost, setTotalCost] = useState(0);
   const [inv, setInv] = useState<Chemical[]>([]);
   const [doses, setDoses] = useState<DoseLog[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptLogEntry[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("fl_oz");
   const [qty, setQty] = useState<number | null>(null);
   const [cost, setCost] = useState<number | null>(null);
+
+  // Receipt scanning (optional — hidden unless a local VLM is configured).
+  const [aiOn, setAiOn] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [draftTotal, setDraftTotal] = useState<number | null | undefined>(undefined);
+  const [draftItems, setDraftItems] = useState<ReceiptItem[] | null>(null);
+  const [receivedAt, setReceivedAt] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     if (!current) return;
@@ -39,9 +50,52 @@ export default function Consumption() {
     setTotalCost(c.total_cost);
     setInv(await api.listChemicals(current.id));
     setDoses((await api.listDoses(current.id)).slice(-12).reverse());
+    setReceipts(await api.listReceipts(current.id));
   }
 
   useEffect(() => { load().catch(() => {}); }, [current]);
+  useEffect(() => {
+    api.aiStatus().then((s) => setAiOn(s.enabled)).catch(() => setAiOn(false));
+  }, []);
+
+  async function onPickReceipt(f: File) {
+    setScanning(true);
+    setErr(null);
+    try {
+      const d: ReceiptDraft = await api.scanReceipt(current!.id, f);
+      setReceiptFile(f);
+      setDraftTotal(d.total ?? null);
+      setDraftItems(d.items);
+      const today = new Date().toISOString().slice(0, 10);
+      setReceivedAt(today);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function setDraftItem(i: number, patch: Partial<ReceiptItem>) {
+    setDraftItems((rows) => rows && rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  }
+
+  async function confirmReceipt() {
+    if (!draftItems) return;
+    setConfirming(true);
+    setErr(null);
+    try {
+      await api.confirmReceipt(current!.id, draftItems, receivedAt || null, receiptFile);
+      setDraftItems(null);
+      setReceiptFile(null);
+      await load();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const draftSum = (draftItems ?? []).reduce((s, i) => s + (i.price ?? 0), 0);
 
   if (!current) return <NoPool />;
 
@@ -64,6 +118,71 @@ export default function Consumption() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Chemical usage &amp; cost</h1>
+
+      {/* Receipt review — shown after a scan, before it touches inventory. */}
+      {draftItems && (
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Review receipt items</div>
+            <button onClick={() => setDraftItems(null)} className="text-slate-400 text-lg leading-none">×</button>
+          </div>
+          {draftItems.length === 0 && (
+            <p className="text-sm text-slate-400">No chemical items found — add them below or discard.</p>
+          )}
+          <div className="space-y-2">
+            {draftItems.map((it, i) => (
+              <div key={i} className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end rounded-xl bg-slate-50 p-2">
+                <div className="col-span-2 sm:col-span-1">
+                  <TextField label="Name" value={it.name} onChange={(v) => setDraftItem(i, { name: v })} />
+                </div>
+                <TextField label="Strength" value={it.strength ?? ""} placeholder="12.5%"
+                  onChange={(v) => setDraftItem(i, { strength: v || null })} />
+                <NumberField label="Qty" value={it.package_qty ?? null} min={0} step="0.01"
+                  onChange={(v) => setDraftItem(i, { package_qty: v })} />
+                <SelectField label="Unit" value={it.unit} onChange={(v) => setDraftItem(i, { unit: v })}
+                  options={UNIT_CHOICES} />
+                <div className="flex items-end gap-1">
+                  <div className="flex-1">
+                    <NumberField label="$ price" value={it.price ?? null} min={0} step="0.01"
+                      onChange={(v) => setDraftItem(i, { price: v })} />
+                  </div>
+                  <button onClick={() => setDraftItems((rows) => rows!.filter((_, j) => j !== i))}
+                    className="pb-2 text-red-500 text-sm" title="Remove item">Remove</button>
+                </div>
+                <div className="sm:col-span-6 -mt-1 text-xs text-slate-400">
+                  {it.price != null && it.package_qty ? `${money(it.price / it.package_qty)} per ${prettyUnit(it.unit)} (read-only)` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 items-end">
+            <div>
+              <span className="text-sm text-slate-600">Date</span>
+              <input type="date" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-sky-500" />
+            </div>
+            <Button variant="ghost" onClick={() =>
+              setDraftItems((rows) => [...(rows ?? []), { name: "", package_qty: null, unit: "fl_oz" }])}>
+              + Add item
+            </Button>
+            <div className="text-sm text-slate-500 sm:text-right">
+              Items {money(draftSum)}
+              {draftTotal != null && (
+                <span className={Math.abs(draftSum - draftTotal) < 0.01 ? " text-green-600" : " text-amber-600"}>
+                  {" · "}{money(draftTotal)} on receipt
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={confirmReceipt}
+              disabled={confirming || draftItems.some((i) => !i.name.trim() || !i.package_qty)}>
+              {confirming ? "Confirming…" : "Confirm & add to inventory"}
+            </Button>
+            <Button variant="ghost" onClick={() => { setDraftItems(null); setReceiptFile(null); }}>Discard</Button>
+          </div>
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6 items-start">
         {/* Left: spend, breakdown, history */}
@@ -130,6 +249,17 @@ export default function Consumption() {
 
         {/* Right: inventory */}
         <div className="space-y-6">
+          {aiOn && (
+            <>
+              <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickReceipt(f); e.target.value = ""; }} />
+              <Button variant="ghost" className="w-full"
+                onClick={() => fileRef.current?.click()} disabled={scanning}>
+                {scanning ? "Scanning…" : "📷 Scan receipt"}
+              </Button>
+            </>
+          )}
+
           <Card className="space-y-3">
             <div className="text-sm font-medium">Inventory</div>
             {inv.length === 0 && <p className="text-sm text-slate-400">No chemicals tracked yet.</p>}
@@ -157,6 +287,20 @@ export default function Consumption() {
             <ErrorText msg={err} />
             <Button variant="ghost" className="w-full" onClick={addChem} disabled={!name}>Add chemical</Button>
           </Card>
+
+          {receipts.length > 0 && (
+            <Card>
+              <div className="text-sm font-medium mb-2">Recent purchases</div>
+              <div className="space-y-1 text-sm">
+                {receipts.map((r) => (
+                  <div key={r.id} className="flex justify-between border-t border-slate-100 py-1">
+                    <span>{new Date(r.received_at).toLocaleDateString()}</span>
+                    <span className="text-slate-500">{r.item_count} item{r.item_count === 1 ? "" : "s"} · {money(r.total_cost)}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>
