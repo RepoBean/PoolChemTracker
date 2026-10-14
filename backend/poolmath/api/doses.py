@@ -36,6 +36,12 @@ def create_dose(pool_id: int, body: DoseLogCreate, session: Session = Depends(ge
         item = session.get(Chemical, body.chemical_id)
         if not item or item.pool_id != pool_id:
             raise HTTPException(404, "chemical (inventory item) not found")
+        # Prefer the inventory item's canonical name/strength so free-text
+        # variants stop fragmenting consumption totals. (Free-text doses with no
+        # chemical_id keep whatever was typed.)
+        dose.chemical = item.name
+        if item.strength:
+            dose.strength = item.strength
         used = convert(body.amount, body.unit, item.unit)
         if used is None:
             raise HTTPException(
@@ -85,18 +91,34 @@ def consumption(
         q = q.where(DoseLog.applied_at <= end)
     rows = session.exec(q).all()
 
-    agg: dict[tuple[str, str], dict] = {}
+    # One row per chemical, in a single base unit. Group by normalized name
+    # (case/whitespace-insensitive) so "acid", "Acid" and "ac id " variants
+    # don't fragment; the base unit is the inventory item's unit when one
+    # matches, else the unit of the highest-cost dose in the window.
+    inventory = {" ".join(c.name.lower().split()): c
+                 for c in session.exec(select(Chemical).where(Chemical.pool_id == pool_id)).all()}
+    groups: dict[str, list[DoseLog]] = {}
     for d in rows:
-        key = (d.chemical, d.unit)
-        a = agg.setdefault(key, {"chemical": d.chemical, "unit": d.unit,
-                                 "total_amount": 0.0, "total_cost": 0.0, "count": 0})
-        a["total_amount"] += d.amount
-        a["total_cost"] += d.cost or 0.0
-        a["count"] += 1
+        groups.setdefault(" ".join(d.chemical.lower().split()), []).append(d)
 
-    items = [
-        {**a, "total_amount": round(a["total_amount"], 2), "total_cost": round(a["total_cost"], 2)}
-        for a in agg.values()
-    ]
+    items = []
+    for key, group in groups.items():
+        inv = inventory.get(key)
+        if inv is not None:
+            name, base = inv.name, inv.unit
+        else:
+            name = group[0].chemical
+            base = max(group, key=lambda d: d.cost or 0.0).unit
+        total = 0.0
+        for d in group:
+            converted = convert(d.amount, d.unit, base)
+            if converted is not None:  # incompatible dimensions: count, don't sum
+                total += converted
+        items.append({
+            "chemical": name, "unit": base,
+            "total_amount": round(total, 2),
+            "total_cost": round(sum(d.cost or 0.0 for d in group), 2),
+            "count": len(group),
+        })
     items.sort(key=lambda a: a["total_cost"], reverse=True)
     return {"items": items, "total_cost": round(sum(a["total_cost"] for a in items), 2)}

@@ -130,3 +130,17 @@ dir>/receipts/<utc-timestamp>.<ext>` (i.e. inside the bind-mounted, ZFS-
   human review form as backstop; the code only drops nameless lines. Receipt
   total vs item-sum mismatch is surfaced in the UI as a sanity hint, not an
   error — receipts include tax.
+
+## Consumption aggregation
+- **One row per chemical name, in one base unit.** `/consumption` groups by
+  case/whitespace-normalized name (so "acid"/"Acid"/"ACID" merge) and converts
+  every dose amount into a single base unit per chemical:
+  **the matching inventory item's unit if one exists, else the unit of the
+  highest-cost dose in the window** (the most representative purchase unit).
+  Cost summing is unchanged; doses in an incompatible dimension (a "gallon"
+  and a "pound" under one name) are counted but not summed — silently mixing
+  volume + weight would fabricate numbers.
+- **`POST /doses` with `chemical_id`** now writes the inventory item's
+  canonical `name`/`strength` onto the dose record, so free-text variants stop
+  fragmenting totals. Free-text doses without `chemical_id` keep what was
+  typed (backwards compatible).
